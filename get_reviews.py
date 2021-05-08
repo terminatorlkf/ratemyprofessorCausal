@@ -17,13 +17,21 @@ other_names = ["Professor Name", "Difficulty", "Quality", "School Name", 'pid', 
 os.environ['MOZ_HEADLESS'] = '1'
 
 def get_html_soup(url, use_selenium=True):
-    print(url)
+    # Get beautiful soup object containing html of url
+    # url: url to get beautiful soup object from
+    # use_selenium: whether selenium is requrired to click through all pagination
+
     html_source = "foo"
     if use_selenium:
+
         driver = webdriver.Firefox()
         driver.get(url)
+
+        # click on button to accept cookies
         accept_cookies_button = driver.find_element_by_xpath("/html/body//div[contains(@class, 'FullPageModal__StyledFullPageModal')]/button[contains(@class, 'StyledCloseButton')]")
         accept_cookies_button.click()
+
+        # repeatedly click on pagination button
         while(True):
             try:
                 expand_button = driver.find_element_by_xpath("/html/body//button[contains(@class, 'PaginationButton')]")
@@ -34,9 +42,12 @@ def get_html_soup(url, use_selenium=True):
                 break
             except ElementClickInterceptedException:
                 break
+
         html_source = driver.page_source
         driver.quit()
     else:
+        # use requests to get html if use_selenium is false
+
         time.sleep(random.randint(5, 10))
         r = requests.get(url)
         html_source = r.text
@@ -44,6 +55,8 @@ def get_html_soup(url, use_selenium=True):
     return bs4.BeautifulSoup(html_source)
 
 def get_school_link_list(soup):
+    # get all professor review links from university search
+
     link_list = []
     for professor in soup.find_all(name='a', class_=re.compile("TeacherCard__StyledTeacherCard.*")):
         num_reviews = int(re.sub(' ratings$', '', professor.find(name='div', class_=re.compile("CardNumRating__CardNumRatingCount")).text))
@@ -51,9 +64,16 @@ def get_school_link_list(soup):
     return link_list
 
 def get_ratings_dict(soup, sid, pid):
+    # get all all review data from professor review page
+    # soup: beautiful soup object with professor rating page html data
+    # sid: rate my professor school id
+    # pid: rate my professor professor id for page
+
     professor_review_list = []
     professor_info = soup.find(name='div', class_=re.compile("TeacherInfo.*"))
     if professor_info is not None:
+
+        # Find professor name and university
         professor_name_tags = professor_info.find(name='div', class_=re.compile("NameTitle__Name.*")).find_all(name="span")
         professor_school = professor_info.find(name='div', class_=re.compile("NameTitle__Title.*")).find(name="a").text
         professor_name = ""
@@ -62,6 +82,8 @@ def get_ratings_dict(soup, sid, pid):
                 professor_name += " "
             professor_name += name.text
         university = professor_info.find(name='div', class_=re.compile("NameTitle.*")).find(name="span").text
+
+        # Look through each rating
         for ratings_list in soup.find_all(name='ul', id='ratingsList'):
             for rating_list in ratings_list.find_all(name='li'):
                 class_name = rating_list.find(name='div', class_=re.compile("RatingHeader__StyledClass.*"))
@@ -71,20 +93,28 @@ def get_ratings_dict(soup, sid, pid):
                     rating_dict["sid"] = sid
                     rating_dict["pid"] = pid
                     rating_dict["School Name"] = professor_school
+
+                    # determine if the ratings is for an online course
                     online_image = class_name.find(name='img', class_=re.compile("OnlineCourseLogo.*"))
                     if online_image is None:
                         rating_dict['online class'] = False
                     else:
                         rating_dict['online class'] = True
                     rating_dict['Class'] = class_name.text
+
+                    # Find date for rating
                     timestamp = rating_list.find(name='div', class_=re.compile("TimeStamp.*"))
                     rating_dict['Timestamp'] = timestamp.text
                     meta_items = rating_list.find_all(name='div', class_=re.compile("MetaItem.*"))
+
+                    # Record value for all meta items
                     for meta_item in meta_items:
                         key_value = re.sub(':\s*$', '', meta_item.contents[0]).lower()
                         item_value = meta_item.find(name='span').contents[0].lower()
                         rating_dict[key_value] = item_value
                     tag_list = rating_list.find(name='div', class_=re.compile("RatingTags.*"))
+
+                    # Record all tags listed in the review
                     if tag_list is not None:
                         for tag in tag_list.find_all(name='span'):
                             if tag.text.lower() in tag_names:
@@ -94,6 +124,8 @@ def get_ratings_dict(soup, sid, pid):
 
                     rating_dict[card_headers[0].text] = card_values[0].text
                     rating_dict[card_headers[1].text] = card_values[1].text
+
+                    # Fill in data for missing meta items and tags
                     for meta_name in meta_names:
                         if meta_name not in rating_dict:
                             rating_dict[meta_name] = None
@@ -104,6 +136,9 @@ def get_ratings_dict(soup, sid, pid):
     return professor_review_list
 
 def create_ratings_csv(csv_path):
+    # Cycle through professors in order of increasing sid
+    # Output all reviews to csv on csv_path
+
     last_professor_name = ""
     last_sid = 1
     with open(csv_path, 'w') as ratings_csv:
