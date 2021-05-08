@@ -31,3 +31,5 @@ def clean_data(original_csv_name, updated_csv_name):
                 row["Timestamp"] = date.timestamp()
             row["Professor Name"] = re.sub(r'\W*$', '', row["Professor Name"])
             csv_writer.writerow(row)
+
+clean_data('rmp_ratings.csv', 'cleaned_ratings.csv')

@@ -22,7 +22,7 @@ def get_html_soup(url, use_selenium=True):
     if use_selenium:
         driver = webdriver.Firefox()
         driver.get(url)
-        accept_cookies_button = driver.find_element_by_xpath("/html/body//button[contains(@class, 'StyledCloseButton')]")
+        accept_cookies_button = driver.find_element_by_xpath("/html/body//div[contains(@class, 'FullPageModal__StyledFullPageModal')]/button[contains(@class, 'StyledCloseButton')]")
         accept_cookies_button.click()
         while(True):
             try:
@@ -106,37 +106,22 @@ def get_ratings_dict(soup, sid, pid):
 def create_ratings_csv(csv_path):
     last_professor_name = ""
     last_sid = 1
-    with open(csv_path, 'r') as ratings_csv:
-        csv_reader = csv.DictReader(ratings_csv)
-        csv_list = list(csv_reader)
-        last_prof = csv_list[-1]
-        last_professor_name = last_prof["Professor Name"]
-        last_sid = last_prof["sid"]
-    with open(csv_path, 'a') as ratings_csv:
+    with open(csv_path, 'w') as ratings_csv:
         fieldnames = []
         fieldnames += meta_names + tag_names + other_names
         csv_writer = csv.DictWriter(ratings_csv, fieldnames=fieldnames)
         sid = int(last_sid)
-        reached_last_prof = False
         while True:
-#            try:
-                school_professor_list = get_school_link_list(get_html_soup('https://www.ratemyprofessors.com/search/teachers?query=*&sid=' + str(sid)))
-                for professor_link in school_professor_list:
-                    if reached_last_prof:
-                        pid = professor_link[professor_link[0].find('=') + 1:]
-                        review_list = []
-                        if professor_link[1] > 20:
-                            review_list = get_ratings_dict(get_html_soup(professor_link[0]), sid, pid)
-                        else:
-                            review_list = get_ratings_dict(get_html_soup(professor_link[0], False), sid, pid)
-                        for review in review_list:
-                            csv_writer.writerow(review)
-                    if professor_link[0] == 'https://www.ratemyprofessors.com/ShowRatings.jsp?tid=850597':
-                        reached_last_prof = True
-                sid += 1
-#            except:
-#                print("Failed on school sid {}".format(sid))
-#                print(sys.exc_info()[0])
-#                break
+            school_professor_list = get_school_link_list(get_html_soup('https://www.ratemyprofessors.com/search/teachers?query=*&sid=' + str(sid)))
+            for professor_link in school_professor_list:
+                pid = professor_link[professor_link[0].find('=') + 1:]
+                review_list = []
+                if professor_link[1] > 20:
+                    review_list = get_ratings_dict(get_html_soup(professor_link[0]), sid, pid)
+                else:
+                    review_list = get_ratings_dict(get_html_soup(professor_link[0], False), sid, pid)
+                for review in review_list:
+                    csv_writer.writerow(review)
+            sid += 1
 
 create_ratings_csv('rmp_ratings.csv')
